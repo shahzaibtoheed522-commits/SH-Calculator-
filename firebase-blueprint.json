@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing secure access settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "User UID from Firebase Auth" },
+        "passcode": { "type": "string", "description": "SHA-256 hashed passcode for the vault" },
+        "isSetup": { "type": "boolean", "description": "Whether the user has set up their passcode" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "passcode", "isSetup"]
+    },
+    "VaultItem": {
+      "title": "Vault Item",
+      "description": "An encrypted item stored in the secure vault",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "description": "AES-encrypted title" },
+        "content": { "type": "string", "description": "AES-encrypted content" },
+        "type": { "type": "string", "enum": ["text", "note", "credential"] },
+        "ownerId": { "type": "string", "description": "The UID of the user who owns this item" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "type", "ownerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Collection of user security profiles"
+    },
+    "vaultItems": {
+      "schema": "VaultItem",
+      "description": "Collection of encrypted personal items"
+    }
+  }
+}

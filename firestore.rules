@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(ownerId) { return isSignedIn() && request.auth.uid == ownerId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // 1. User Profile Security
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.id == userId &&
+               data.passcode is string && data.passcode.size() == 64 && // SHA-256 is 64 chars in hex
+               data.isSetup is bool &&
+               data.updatedAt is timestamp &&
+               data.keys().hasAll(['id', 'passcode', 'isSetup', 'updatedAt']) &&
+               data.keys().size() == 4;
+      }
+
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().updatedAt == request.time &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['passcode', 'isSetup', 'updatedAt']);
+    }
+
+    // 2. Vault Item Security
+    match /vaultItems/{itemId} {
+      function isValidVaultItem(data) {
+        return isValidId(data.ownerId) &&
+               data.title is string && data.title.size() <= 2000 &&
+               data.content is string && data.content.size() <= 1000000 && // 1MB limit for safety
+               data.type in ['text', 'note', 'credential'] &&
+               data.createdAt is timestamp &&
+               data.keys().hasAll(['ownerId', 'title', 'content', 'type', 'createdAt']) &&
+               data.keys().size() == 5;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isOwner(existing().ownerId);
+      
+      allow create: if isSignedIn() && 
+                    isOwner(incoming().ownerId) && 
+                    isValidVaultItem(incoming()) && 
+                    incoming().createdAt == request.time;
+                    
+      allow update: if isOwner(existing().ownerId) && 
+                    isOwner(incoming().ownerId) && 
+                    isValidVaultItem(incoming()) &&
+                    incoming().createdAt == existing().createdAt && // Immutable
+                    incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'type']);
+                    
+      allow delete: if isOwner(existing().ownerId);
+    }
+  }
+}
