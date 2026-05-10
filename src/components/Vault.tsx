@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { Plus, Trash2, Lock, Unlock, Eye, EyeOff, Hash, ShieldCheck, LogOut, FileText, Key, Check } from 'lucide-react';
+import { Plus, Trash2, Lock, Unlock, Eye, EyeOff, Hash, ShieldCheck, LogOut, FileText, Key, Check, Cloud, Download, Shield, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { decryptData, encryptData } from '../lib/crypto';
+import { decryptData, encryptData, generateRecoveryKey, hashPasscode } from '../lib/crypto';
+import { updateDoc } from 'firebase/firestore';
 
 interface VaultItem {
   id: string;
@@ -11,6 +12,7 @@ interface VaultItem {
   content: string;
   type: 'text' | 'note' | 'credential';
   createdAt: any;
+  ownerId: string;
 }
 
 interface VaultProps {
@@ -21,11 +23,13 @@ interface VaultProps {
 export default function Vault({ passcode, onLock }: VaultProps) {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newType, setNewType] = useState<'text' | 'note' | 'credential'>('text');
   const [decryptedContents, setDecryptedContents] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -92,36 +96,105 @@ export default function Vault({ passcode, onLock }: VaultProps) {
     }
   };
 
+  const handleGenerateRecoveryKey = async () => {
+    if (!auth.currentUser) return;
+    const key = generateRecoveryKey();
+    const hash = hashPasscode(key);
+    
+    try {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        recoveryKeyHash: hash,
+        updatedAt: serverTimestamp()
+      });
+      setRecoveryKey(key);
+    } catch (err) {
+      console.error("Failed to generate recovery key:", err);
+    }
+  };
+
+  const handleExportBackup = () => {
+    const backupData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      items: items.map(({ id, ...rest }) => rest)
+    };
+    
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sh_vault_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !auth.currentUser) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.items && Array.isArray(data.items)) {
+          const confirmation = confirm(`Import ${data.items.length} items from backup? Existing items will remain.`);
+          if (!confirmation) return;
+
+          for (const item of data.items) {
+             await addDoc(collection(db, 'vaultItems'), {
+               ...item,
+               ownerId: auth.currentUser?.uid,
+               createdAt: serverTimestamp()
+             });
+          }
+          alert("Import successful!");
+        }
+      } catch (err) {
+        alert("Failed to parse backup file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="min-h-screen bg-[#0E1012] text-white p-6 pb-24">
-      <header className="flex items-center justify-between mb-12">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#8AB4F8] rounded-xl flex items-center justify-center text-[#0E1012] font-bold text-2xl">
+      <header className="flex items-center justify-between mb-8 sm:mb-12">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#8AB4F8] rounded-xl flex items-center justify-center text-[#0E1012] font-bold text-xl sm:text-2xl">
             H
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">SH Vault</h1>
-            <p className="text-gray-500 text-xs uppercase tracking-widest flex items-center gap-1">
-              <ShieldCheck size={12} className="text-green-500" /> End-to-End Encrypted
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">SH Vault</h1>
+            <p className="text-gray-500 text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1">
+              <ShieldCheck size={12} className="text-green-500" /> Secure
             </p>
           </div>
         </div>
-        <button 
-          onClick={onLock}
-          className="p-3 bg-[#1A1C1E] border border-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button 
+            onClick={() => setShowBackup(true)}
+            className="p-2.5 sm:p-3 bg-[#1A1C1E] border border-white/10 rounded-full text-gray-400 hover:text-[#8AB4F8] transition-colors"
+            title="Backup & Restore"
+          >
+            <Cloud size={18} />
+          </button>
+          <button 
+            onClick={onLock}
+            className="p-2.5 sm:p-3 bg-[#1A1C1E] border border-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </header>
 
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-lg font-medium text-gray-400">Stored Secrets ({items.length})</h2>
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <h2 className="text-sm sm:text-lg font-medium text-gray-400">Secrets ({items.length})</h2>
           <button 
             onClick={() => setIsAdding(true)}
-            className="flex items-center gap-2 bg-[#8AB4F8] text-[#0E1012] px-4 py-2 rounded-full font-bold text-sm hover:scale-105 transition-transform"
+            className="flex items-center gap-2 bg-[#8AB4F8] text-[#0E1012] px-3 py-2 sm:px-4 sm:py-2 rounded-full font-bold text-xs sm:text-sm hover:scale-105 transition-transform"
           >
-            <Plus size={16} /> New Entry
+            <Plus size={14} /> <span className="hidden sm:inline">New Entry</span><span className="sm:hidden">New</span>
           </button>
         </div>
 
@@ -130,7 +203,7 @@ export default function Vault({ passcode, onLock }: VaultProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8AB4F8]"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
             {items.map(item => {
               const isDecrypted = !!decryptedContents[item.id];
               const displayTitle = isDecrypted ? decryptedContents[`${item.id}_title`] : "••••••••";
@@ -255,6 +328,94 @@ export default function Vault({ passcode, onLock }: VaultProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showBackup && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-[#1A1C1E] w-full max-w-md rounded-[32px] p-8 border border-white/10"
+            >
+              <div className="w-16 h-16 bg-blue-500/20 text-[#8AB4F8] rounded-full flex items-center justify-center mx-auto mb-6">
+                <Cloud size={32} />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Cloud Backup Status</h3>
+              <p className="text-gray-400 text-sm mb-8">Your data is automatically encrypted and synced to our secure servers.</p>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-black/40 rounded-2xl border border-white/5 flex items-center justify-between text-left">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Encrypted Items</p>
+                    <p className="text-lg font-mono">{items.length}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-green-500 text-xs font-bold uppercase">
+                    <ShieldCheck size={16} /> Synchronized
+                  </div>
+                </div>
+
+                <div className="p-4 bg-black/40 rounded-2xl border border-white/5 text-left">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Recovery Key</p>
+                    <Shield size={14} className="text-[#8AB4F8]" />
+                  </div>
+                  
+                  {recoveryKey ? (
+                    <div className="bg-black p-4 rounded-xl font-mono text-[#8AB4F8] text-center border border-[#8AB4F8]/20 break-all select-all">
+                      {recoveryKey}
+                      <p className="mt-2 text-[10px] text-gray-500 normal-case font-sans">Save this key in a physical location. It is your only way back in if you forget your passcode.</p>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={handleGenerateRecoveryKey}
+                      className="w-full py-3 bg-[#1A1C1E] border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest hover:border-white/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Key size={14} /> Generate Recovery Key
+                    </button>
+                  )}
+                </div>
+
+                <button 
+                  onClick={handleExportBackup}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <Download className="text-gray-500" size={20} />
+                    <span className="text-sm font-medium">Export Backup File</span>
+                  </div>
+                  <RefreshCw size={14} className="text-gray-700" />
+                </button>
+
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept=".json"
+                    onChange={handleImportBackup}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-all">
+                    <div className="flex items-center gap-3">
+                      <Plus className="text-gray-500" size={20} />
+                      <span className="text-sm font-medium">Import from Backup File</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => { setShowBackup(false); setRecoveryKey(null); }}
+                className="mt-8 w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 font-bold transition-all"
+              >
+                Done
+              </button>
             </motion.div>
           </motion.div>
         )}

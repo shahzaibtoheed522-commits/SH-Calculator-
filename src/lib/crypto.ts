@@ -42,3 +42,15 @@ export function decryptData(encryptedData: string, passcode: string, uid: string
     throw error;
   }
 }
+
+/**
+ * Generates a random alphanumeric recovery key (24 chars).
+ */
+export function generateRecoveryKey(): string {
+  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let retVal = "";
+  for (let i = 0; i < 24; ++i) {
+    retVal += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return retVal;
+}

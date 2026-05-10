@@ -17,18 +17,17 @@ service cloud.firestore {
     match /users/{userId} {
       function isValidUser(data) {
         return data.id == userId &&
-               data.passcode is string && data.passcode.size() == 64 && // SHA-256 is 64 chars in hex
+               data.passcode is string && data.passcode.size() == 64 &&
                data.isSetup is bool &&
                data.updatedAt is timestamp &&
-               data.keys().hasAll(['id', 'passcode', 'isSetup', 'updatedAt']) &&
-               data.keys().size() == 4;
+               (data.keys().hasOnly(['id', 'passcode', 'isSetup', 'updatedAt', 'recoveryKeyHash']));
       }
 
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().updatedAt == request.time;
       allow update: if isOwner(userId) && isValidUser(incoming()) && 
                     incoming().updatedAt == request.time &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['passcode', 'isSetup', 'updatedAt']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['passcode', 'isSetup', 'updatedAt', 'recoveryKeyHash']);
     }
 
     // 2. Vault Item Security

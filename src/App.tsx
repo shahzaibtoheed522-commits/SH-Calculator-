@@ -35,23 +35,23 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleUnlock = async (enteredPasscode: string) => {
+  const handleUnlock = async (enteredKey: string) => {
     if (!user) return;
     
     setLoading(true);
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.exists()) {
-        const storedHash = userDoc.data().passcode;
-        const enteredHash = hashPasscode(enteredPasscode);
+        const storedPasscodeHash = userDoc.data().passcode;
+        const storedRecoveryHash = userDoc.data().recoveryKeyHash;
+        const enteredHash = hashPasscode(enteredKey);
         
-        if (storedHash === enteredHash) {
-          setPasscode(enteredPasscode);
+        if (storedPasscodeHash === enteredHash || (storedRecoveryHash && storedRecoveryHash === enteredHash)) {
+          setPasscode(enteredKey);
           setVaultUnlocked(true);
           setErrorMessage('');
         } else {
           // If it doesn't match, we just let it be a normal calculation
-          // but we can log failed attempts locally if needed.
         }
       }
     } catch (err) {
@@ -120,27 +120,27 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0E1012] flex flex-col items-center justify-center p-6 bg-radial-[at_50%_0%] from-[#1A1C1E] to-[#0E1012]">
-        <div className="mb-12 text-center text-white">
+      <div className="min-h-screen bg-[#0E1012] flex flex-col items-center justify-center p-4 sm:p-6 bg-radial-[at_50%_0%] from-[#1A1C1E] to-[#0E1012]">
+        <div className="mb-8 sm:mb-12 text-center text-white">
            <motion.div 
               initial={{ rotate: -10, scale: 0.8 }}
               animate={{ rotate: 0, scale: 1 }}
-              className="w-24 h-24 bg-[#8AB4F8] rounded-[32px] flex items-center justify-center text-[#1A1C1E] font-bold text-5xl mx-auto mb-6 shadow-[0_0_50px_rgba(138,180,248,0.3)]"
+              className="w-20 h-20 sm:w-24 sm:h-24 bg-[#8AB4F8] rounded-[24px] sm:rounded-[32px] flex items-center justify-center text-[#1A1C1E] font-bold text-4xl sm:text-5xl mx-auto mb-4 sm:mb-6 shadow-[0_0_50px_rgba(138,180,248,0.3)]"
             >
               H
             </motion.div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">SH Calculator</h1>
-            <p className="text-gray-400 max-w-xs mx-auto">The world's most secure hidden vault disguised as a simple calculator.</p>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">SH Calculator</h1>
+            <p className="text-gray-400 text-sm sm:text-base max-w-xs mx-auto">The world's most secure hidden vault disguised as a simple calculator.</p>
         </div>
 
         <button 
           onClick={loginWithGoogle}
-          className="flex items-center gap-3 bg-white text-black px-8 py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-xl"
+          className="flex items-center gap-3 bg-white text-black px-6 py-3 sm:px-8 sm:py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-xl text-sm sm:text-base"
         >
           <LogIn size={20} /> Continue with Google
         </button>
 
-        <div className="mt-12 grid grid-cols-3 gap-8 text-center text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+        <div className="mt-8 sm:mt-12 grid grid-cols-3 gap-4 sm:gap-8 text-center text-[8px] sm:text-[10px] text-gray-500 uppercase tracking-widest font-bold">
            <div><Shield className="mx-auto mb-2 text-[#8AB4F8]" size={16}/> Encrypted</div>
            <div><Hash className="mx-auto mb-2 text-[#8AB4F8]" size={16}/> Zero Knowledge</div>
            <div><Key className="mx-auto mb-2 text-[#8AB4F8]" size={16}/> Hidden Vault</div>
@@ -151,14 +151,14 @@ export default function App() {
 
   if (isSetupNeeded) {
     return (
-      <div className="min-h-screen bg-[#0E1012] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0E1012] flex items-center justify-center p-4 sm:p-6">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm bg-[#1A1C1E] rounded-[40px] p-10 border border-white/5"
+          className="w-full max-w-sm bg-[#1A1C1E] rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 border border-white/5"
         >
-          <h2 className="text-2xl font-bold text-white mb-2">{setupStep === 1 ? 'Shield Your Data' : 'Confirm Passcode'}</h2>
-          <p className="text-gray-500 text-sm mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">{setupStep === 1 ? 'Shield Your Data' : 'Confirm Passcode'}</h2>
+          <p className="text-gray-500 text-sm mb-6 sm:mb-8">
             {setupStep === 1 
               ? 'Choose a secret passcode to unlock your vault via the calculator.' 
               : 'Enter the passcode again to verify your setup.'}
@@ -173,7 +173,7 @@ export default function App() {
               required
               value={tempPasscode}
               onChange={e => setTempPasscode(e.target.value.replace(/[^0-9]/g, ''))}
-              className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-center text-4xl text-[#8AB4F8] tracking-[0.5em] focus:outline-none focus:border-[#8AB4F8] transition-colors mb-6"
+              className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 text-center text-3xl sm:text-4xl text-[#8AB4F8] tracking-[0.5em] focus:outline-none focus:border-[#8AB4F8] transition-colors mb-6"
             />
             {errorMessage && <p className="text-red-400 text-xs text-center mb-4">{errorMessage}</p>}
             <button 

@@ -7,6 +7,7 @@
       "properties": {
         "id": { "type": "string", "description": "User UID from Firebase Auth" },
         "passcode": { "type": "string", "description": "SHA-256 hashed passcode for the vault" },
+        "recoveryKeyHash": { "type": "string", "description": "SHA-256 hashed recovery key" },
         "isSetup": { "type": "boolean", "description": "Whether the user has set up their passcode" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

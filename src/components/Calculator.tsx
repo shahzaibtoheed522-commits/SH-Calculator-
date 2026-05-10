@@ -68,24 +68,24 @@ export default function Calculator({ onUnlock }: CalculatorProps) {
   ];
 
   return (
-    <div className="max-w-md mx-auto bg-[#1A1C1E] p-6 rounded-[40px] shadow-2xl border border-white/5">
-      <div className="mb-8 px-4 py-8 text-right min-h-[140px] flex flex-col justify-end">
-        <div className="text-gray-500 text-lg font-mono mb-2 overflow-hidden whitespace-nowrap">
+    <div className="w-full max-w-md mx-auto bg-[#1A1C1E] p-4 sm:p-6 rounded-[32px] sm:rounded-[40px] shadow-2xl border border-white/5">
+      <div className="mb-4 sm:mb-8 px-4 py-4 sm:py-8 text-right min-h-[120px] sm:min-h-[140px] flex flex-col justify-end">
+        <div className="text-gray-500 text-base sm:text-lg font-mono mb-2 overflow-hidden支撑 whitespace-nowrap">
           {equation}
         </div>
-        <div className="text-white text-6xl font-light tracking-tighter overflow-hidden overflow-ellipsis">
+        <div className="text-white text-5xl sm:text-6xl font-light tracking-tighter overflow-hidden overflow-ellipsis">
           {display}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-3 sm:gap-4">
         {buttons.map((btn) => (
           <button
             key={btn.label}
             onClick={btn.action}
             className={`
               ${btn.className || ''}
-              h-16 rounded-full text-xl font-medium transition-all active:scale-95 flex items-center justify-center
+              h-14 sm:h-16 rounded-full text-lg sm:text-xl font-medium transition-all active:scale-95 flex items-center justify-center
               ${btn.type === 'num' ? 'bg-[#2D2F31] text-white hover:bg-[#3D3F41]' : ''}
               ${btn.type === 'operator' ? 'bg-[#3E4348] text-[#8AB4F8] hover:bg-[#4E5358]' : ''}
               ${btn.type === 'clear' ? 'bg-[#5F6368] text-white hover:bg-[#6F7378]' : ''}
